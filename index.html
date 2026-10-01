@@ -42,41 +42,54 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--x);outline-offs
 .help{color:var(--mute);font-size:13px;margin-top:12px;max-width:72ch}
 </style></head><body><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient x1="197.66982" y1="111.06455" x2="271.2096" y2="111.06455" gradientUnits="userSpaceOnUse" id="g1"><stop offset="0" stop-color="#f07311" /><stop offset="1" stop-color="#a4450b" /></linearGradient><linearGradient x1="188.61057" y1="165.10428" x2="290.04265" y2="165.10428" gradientUnits="userSpaceOnUse" id="g2"><stop offset="0" stop-color="#efa110" /><stop offset="1" stop-color="#176f55" /></linearGradient><linearGradient x1="188.61057" y1="159.35246" x2="290.04265" y2="159.35246" gradientUnits="userSpaceOnUse" id="g3"><stop offset="0" stop-color="#ef9e11" /><stop offset="0.11792" stop-color="#fff700" /><stop offset="1" stop-color="#28be91" /></linearGradient><linearGradient x1="197.66982" y1="111.06455" x2="271.2096" y2="111.06455" gradientUnits="userSpaceOnUse" id="g1f"><stop offset="0" stop-color="#4aa0ff" /><stop offset="1" stop-color="#174b9c" /></linearGradient></defs></svg>
 <main>
-<div class="opt"><label><input type="checkbox" id="oF"> Flip</label><label><input type="checkbox" id="oQ"> Quantum Superpositions</label><label><input type="checkbox" id="oCPU"> Singleplayer (CPU as O)</label></div>
+<div class="opt"><label><input type="checkbox" id="oF"> Flip</label><label><input type="checkbox" id="oQ"> Quantum Superpositions</label><label><input type="checkbox" id="oSP"> Soundproof</label><label><input type="checkbox" id="oT"> Tunneller</label><label><input type="checkbox" id="oCPU"> Singleplayer (CPU as O)</label></div>
 <div class="bar"><div class="turn" id="turn"></div><button class="b" id="undo">Undo</button><button class="b" id="new">New game</button><button class="b" id="full"></button><span class="meta" id="meta"></span></div>
 <div class="modes" id="modes"></div>
-<div id="ask"><span>That square clashes with a later board.</span><button class="b" id="aB">New universe</button><button class="b" id="aQ">Quantum merge</button><button class="b" id="aC">Cancel</button></div>
+<div id="ask"><span id="askTxt">That square clashes with a later board.</span><button class="b" id="aB">New universe</button><button class="b" id="aQ">Quantum merge</button><button class="b" id="aC">Cancel</button></div>
 <p id="msg" role="status" aria-live="polite"></p>
 <div class="field" id="field"></div>
 <div class="log"><h2>Moves</h2><div id="log"></div></div>
-<p class="help">Time runs upward; board 1 is the empty start, and the view zooms out as time is reached. The dashed board on top is the next move; use Expand to jump further ahead. Playing on a past board echoes the piece up through later boards; if a later board already holds that square, a new universe branches (or merges into a quantum piece, if enabled). Squares follow the board edges, as labeled on each board: letters run along the left edge (a1 is the left corner), numbers along the right edge (c1 is the front corner). You can\u2019t play on a universe\u2019s present (latest) board. <b>#</b> win, <b>&amp;</b> tie. Flip notation: <b>XFa3-A2</b> flips a piece, <b>XFA2</b> flips a past board; a <b>~</b> after the square means it was placed flipped. Lines need matching orientation; quantum pieces count as both players and either orientation, and can't be flipped. A flip also flips that square on later boards in its universe.</p>
+<p class="help">Time runs upward; board 1 is the empty start, and the view zooms out as time is reached. The dashed board on top is the next move; use Expand to jump further ahead. Playing on a past board echoes the piece up through later boards; if a later board already holds that square, a new universe branches (or merges into a quantum piece, if enabled). Squares follow the board edges, as labeled on each board: letters run along the left edge (a1 is the left corner), numbers along the right edge (c1 is the front corner). You can\u2019t play on a universe\u2019s present (latest) board. <b>#</b> win, <b>&amp;</b> tie. Flip notation: <b>XFa3-A2</b> flips a piece, <b>XFA2</b> flips a past board; a <b>~</b> after the square means it was placed flipped. Lines need matching orientation; quantum pieces count as both players and either orientation, and can't be flipped. A flip also flips that square on later boards in its universe. <b>Soundproof</b> stops past moves from echoing forward (quantum merges still echo). <b>Tunneller</b> adds a Wormhole mode: pick an existing piece, then the same square on a different board, to relocate it across universes or time.</p>
 </main>
 <script>
 const N=12,LET='ABCDEFGHIJKL',LN=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const E=()=>Array(9).fill(''),cl=o=>JSON.parse(JSON.stringify(o)),$=i=>document.getElementById(i);
 const co=c=>'abc'[c%3]+(3-(c/3|0));
-const OPT={flip:false,quantum:false,cpu:false};const RM=matchMedia('(prefers-reduced-motion:reduce)').matches,EASE='cubic-bezier(.16,1,.3,1)';let PREV={},PC={},PCN={},READY=false;
-let S,H=[],MODE='place',PEND=null,FULL=false,CPU_BUSY=false;
+const OPT={flip:false,quantum:false,soundproof:false,tunneller:false,cpu:false};const RM=matchMedia('(prefers-reduced-motion:reduce)').matches,EASE='cubic-bezier(.16,1,.3,1)';let PREV={},PC={},PCN={},READY=false;
+let S,H=[],MODE='place',PEND=null,TUNNEL=null,FULL=false,CPU_BUSY=false;
 const ART={frozen:`<g transform="translate(-37.14905,-90.05491)"><g stroke="#000000" stroke-width="0" stroke-miterlimit="10"><path d="M240.71702,270.03563l-202.27217,-80.19086l-0.6905,-22.90882l202.96262,-76.4282l201.30861,73.94709l0.53698,26.56008z" fill="#8d8d8d" /><path d="M240.11172,242.91121l-202.96267,-76.42815l202.96262,-76.42815l202.96262,76.42815z" fill="#8d8d8d" /><path d="M175.34341,216.5122l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill-opacity="0.50196" fill="#ffffff" /><path d="M240.11172,190.87231l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill="#e0e0e0" /><path d="M110.57521,190.87231l64.76825,-24.3893l64.7682,24.3893l-64.76825,24.3893z" fill="#e0e0e0" /><path d="M175.34346,167.73359l64.7682,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill-opacity="0.50196" fill="#ffffff" /><path d="M45.80696,166.48306l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill-opacity="0.50196" fill="#ffffff" /><path d="M110.57521,142.09376l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill="#e0e0e0" /><path d="M304.87992,166.48306l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill-opacity="0.50196" fill="#ffffff" /><path d="M240.3184,142.09376l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill="#e0e0e0" /><path d="M175.34341,118.95499l64.76825,-24.3893l64.76825,24.3893l-64.76825,24.3893z" fill-opacity="0.50196" fill="#ffffff" /><path d="M240.11172,269.58274l-202.27217,-80.19086l-0.6905,-22.90882l202.96262,-76.42815l201.30861,73.94709l0.53698,26.56008zM427.63692,189.802l-0.49896,-24.68093l-187.06591,-68.71534l-188.60291,71.02078l0.64162,21.28802l187.96124,74.51728z" fill="#4b4b4b" /></g></g>`,board:`<g stroke-linecap="butt"><path d="M240.63555,274.37056l-212.36145,-84.19076l-0.72494,-24.0515l213.08634,-80.24042l211.34983,77.63555l0.56376,27.88489z" fill="#8d8d8d" stroke="#000000" stroke-width="0" /><path d="M240.00005,245.89312l-213.08639,-80.24036l213.08634,-80.24036l213.08634,80.24036z" fill="#8d8d8d" stroke="#000000" stroke-width="0" /><path d="M172.00112,216.86442l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#ffffff" stroke="#000000" stroke-width="0" /><path d="M240.00005,191.25848l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#e0e0e0" stroke="#000000" stroke-width="0" /><path d="M104.0023,191.25848l67.99888,-25.60583l67.99882,25.60583l-67.99888,25.60583z" fill="#e0e0e0" stroke="#000000" stroke-width="0" /><path d="M172.00118,165.65281l67.99882,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#ffffff" stroke="#000000" stroke-width="0" /><path d="M36.00337,165.65276l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#ffffff" stroke="#000000" stroke-width="0" /><path d="M104.0023,140.04687l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#e0e0e0" stroke="#000000" stroke-width="0" /><path d="M307.99888,165.65276l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#ffffff" stroke="#000000" stroke-width="0" /><path d="M240.21705,140.04687l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#e0e0e0" stroke="#000000" stroke-width="0" /><path d="M172.00112,114.44109l67.99888,-25.60583l67.99888,25.60583l-67.99888,25.60583z" fill="#ffffff" stroke="#000000" stroke-width="0" /><path d="M240.12972,274.58761v-32.56028l212.29308,-79.23005l-0.86826,28.65305z" fill="#4b4b4b" stroke="none" stroke-width="0" /><text transform="translate(54.40641,194.76139) rotate(20.62251) scale(0.50338,0.44094) skewX(18.2443)" font-size="40" xml:space="preserve" fill="#4b4b4b" stroke="none" stroke-width="1" font-family="Archivo, sans-serif" font-weight="normal" text-anchor="start"><tspan x="0" dy="0">a</tspan></text><text transform="translate(127.77557,222.40129) rotate(17.90836) scale(0.49511,0.44827) skewX(16.30847)" font-size="40" xml:space="preserve" fill="#4b4b4b" stroke="none" stroke-width="1" font-family="Archivo, sans-serif" font-weight="normal" text-anchor="start"><tspan x="0" dy="0">b</tspan></text><text transform="translate(201.14478,249.48814) rotate(20.62251) scale(0.50338,0.44094) skewX(18.2443)" font-size="40" xml:space="preserve" fill="#4b4b4b" stroke="none" stroke-width="1" font-family="Archivo, sans-serif" font-weight="normal" text-anchor="start"><tspan x="0" dy="0">c</tspan></text><text transform="translate(268.00184,253.34253) rotate(-22.30782) scale(0.50921,0.43584) skewX(-19.34993)" font-size="40" xml:space="preserve" fill="#8d8d8d" stroke="none" stroke-width="1" font-family="Archivo, sans-serif" font-weight="normal" text-anchor="start"><tspan x="0" dy="0">1</tspan></text><text transform="translate(340.93401,226.31975) rotate(-22.30782) scale(0.50921,0.43584) skewX(-19.34993)" font-size="40" xml:space="preserve" fill="#8d8d8d" stroke="none" stroke-width="1" font-family="Archivo, sans-serif" font-weight="normal" text-anchor="start"><tspan x="0" dy="0">2</tspan></text><text transform="translate(409.00342,200.29253) rotate(-22.30782) scale(0.50921,0.43584) skewX(-19.34993)" font-size="40" xml:space="preserve" fill="#8d8d8d" stroke="none" stroke-width="1" font-family="Archivo, sans-serif" font-weight="normal" text-anchor="start"><tspan x="0" dy="0">3</tspan></text></g>`,X:`<g stroke="none" stroke-width="0" stroke-linecap="butt"><path d="M60.66228,165.77696l13.00833,-4.89848l39.025,4.89848l-13.00833,-14.69537l13.00833,-4.89848l13.00839,4.89848l-13.00839,14.69537c0,0 -1.4743,-2.259 0.82677,-2.54784c6.19301,-0.77735 38.19824,-2.35064 38.19824,-2.35064l13.00839,4.89848l-13.12345,4.9418l-39.025,-4.89848l13.00833,14.69537l-12.89322,4.8551l-13.06584,-4.92011l12.95078,-14.63036l-38.85233,4.87679z" fill-opacity="0.29804" fill="#000000" /><path d="M93.81279,148.74654v-5.92008l12.66892,14.56335v5.92003z" fill="#1c8565" /><path d="M106.48166,163.30979v-5.92003l12.66892,-14.56335v5.92008z" fill="#176f55" /><path d="M107.2015,163.32281v-5.58177l39.06885,4.74455v5.58177z" fill="#1c8565" /><path d="M67.38612,168.12928v-5.58177l39.06885,-4.74455v5.58177z" fill="#176f55" /><path d="M54.68517,157.6598l13.00833,-4.89848l39.025,4.89848l-13.00833,-14.69537l13.00833,-4.89848l13.00839,4.89848l-13.00839,14.69537l39.02495,-4.89848l13.00839,4.89848l-13.12345,4.9418l-39.025,-4.89848l13.00833,14.69537l-12.89322,4.8551l-13.06589,-4.92011l12.95078,-14.63036l-38.85233,4.87673z" fill="#28be91" /><path d="M54.90464,163.40805v-5.64379l12.48144,4.72123v5.64379z" fill="#1c8565" /><path d="M93.97344,178.0446v-5.64379l12.48149,4.72123v5.64379z" fill="#1c8565" /><path d="M106.45493,182.76583v-5.64379l12.48144,-4.72123v5.64379z" fill="#135a45" /><path d="M146.27036,168.0672v-5.64379l12.48144,-4.72123v5.64379z" fill="#135a45" /></g>`,'X~':`<g stroke="none" stroke-width="0" stroke-linecap="butt"><path d="M60.66228,165.77696l13.00833,-4.89848l39.025,4.89848l-13.00833,-14.69537l13.00833,-4.89848l13.00839,4.89848l-13.00839,14.69537c0,0 -1.4743,-2.259 0.82677,-2.54784c6.19301,-0.77735 38.19824,-2.35064 38.19824,-2.35064l13.00839,4.89848l-13.12345,4.9418l-39.025,-4.89848l13.00833,14.69537l-12.89322,4.8551l-13.06584,-4.92011l12.95078,-14.63036l-38.85233,4.87679z" fill-opacity="0.29804" fill="#000000" /><path d="M93.81279,148.74654v-5.92008l12.66892,14.56335v5.92003z" fill="#6f57e0" /><path d="M106.48166,163.30979v-5.92003l12.66892,-14.56335v5.92008z" fill="#4d3bb0" /><path d="M107.2015,163.32281v-5.58177l39.06885,4.74455v5.58177z" fill="#6f57e0" /><path d="M67.38612,168.12928v-5.58177l39.06885,-4.74455v5.58177z" fill="#4d3bb0" /><path d="M54.68517,157.6598l13.00833,-4.89848l39.025,4.89848l-13.00833,-14.69537l13.00833,-4.89848l13.00839,4.89848l-13.00839,14.69537l39.02495,-4.89848l13.00839,4.89848l-13.12345,4.9418l-39.025,-4.89848l13.00833,14.69537l-12.89322,4.8551l-13.06589,-4.92011l12.95078,-14.63036l-38.85233,4.87673z" fill="#9a82ff" /><path d="M54.90464,163.40805v-5.64379l12.48144,4.72123v5.64379z" fill="#6f57e0" /><path d="M93.97344,178.0446v-5.64379l12.48149,4.72123v5.64379z" fill="#6f57e0" /><path d="M106.45493,182.76583v-5.64379l12.48144,-4.72123v5.64379z" fill="#3a2b8a" /><path d="M146.27036,168.0672v-5.64379l12.48144,-4.72123v5.64379z" fill="#3a2b8a" /></g>`,O:`<g stroke-width="0"><path d="M211.95126,94.89824c0,0 29.38959,-1.93523 47.91337,1.368c4.06404,0.72473 7.60507,4.38765 10.19786,5.36109c14.41094,5.41067 14.65893,14.68382 0.15351,19.5938c-24.96261,8.44969 -48.69287,4.10826 -62.88676,-3.47307c-13.57777,-7.25232 4.62208,-22.84987 4.62208,-22.84987zM220.91062,120.19086h46.56122l-0.13738,-17.53326h-46.56117z" fill-opacity="0.29804" fill="#000000" stroke="none" stroke-linecap="butt" /><path d="M197.66987,100.9339c0,0 3.5645,13.77124 38.37459,13.93887c29.22826,0.1408 35.16515,-15.07076 35.16515,-15.07076v8.00052c0,0 -1.11429,14.05037 -35.35116,14.51256c-35.91582,0.48494 -38.18857,-14.00095 -38.18857,-14.00095v-7.38035z" fill="url(#g1)" stroke="#868686" stroke-linecap="round" /><path d="M211.11262,97.56933v-5.3957h46.70076v5.3957z" fill="#c5590e" stroke="none" stroke-linecap="butt" /><path d="M208.44631,91.28831c14.36856,-5.41067 37.66472,-5.41067 52.03334,0c14.36856,5.41067 14.36856,14.18318 0,19.5938c-14.36856,5.41067 -37.66472,5.41067 -52.03334,0c-14.36856,-5.41067 -14.36856,-14.18318 0,-19.5938zM211.18236,109.85183h46.56122v-17.53326h-46.56122z" fill="#ef9e11" stroke="none" stroke-linecap="butt" /></g>`,'O~':`<g stroke-width="0"><path d="M211.95126,94.89824c0,0 29.38959,-1.93523 47.91337,1.368c4.06404,0.72473 7.60507,4.38765 10.19786,5.36109c14.41094,5.41067 14.65893,14.68382 0.15351,19.5938c-24.96261,8.44969 -48.69287,4.10826 -62.88676,-3.47307c-13.57777,-7.25232 4.62208,-22.84987 4.62208,-22.84987zM220.91062,120.19086h46.56122l-0.13738,-17.53326h-46.56117z" fill-opacity="0.29804" fill="#000000" stroke="none" stroke-linecap="butt" /><path d="M197.66987,100.9339c0,0 3.5645,13.77124 38.37459,13.93887c29.22826,0.1408 35.16515,-15.07076 35.16515,-15.07076v8.00052c0,0 -1.11429,14.05037 -35.35116,14.51256c-35.91582,0.48494 -38.18857,-14.00095 -38.18857,-14.00095v-7.38035z" fill="url(#g1f)" stroke="#868686" stroke-linecap="round" /><path d="M211.11262,97.56933v-5.3957h46.70076v5.3957z" fill="#2366c9" stroke="none" stroke-linecap="butt" /><path d="M208.44631,91.28831c14.36856,-5.41067 37.66472,-5.41067 52.03334,0c14.36856,5.41067 14.36856,14.18318 0,19.5938c-14.36856,5.41067 -37.66472,5.41067 -52.03334,0c-14.36856,-5.41067 -14.36856,-14.18318 0,-19.5938zM211.18236,109.85183h46.56122v-17.53326h-46.56122z" fill="#7ab9ff" stroke="none" stroke-linecap="butt" /></g>`,Q:`<g stroke="#000000" stroke-width="0" stroke-linecap="butt"><path d="M228.56096,148.66215l20.12742,-0.22467l0.35081,6.41394c5.02515,0.50038 9.75851,1.40266 13.73117,2.70696c3.62621,1.1905 6.23234,2.58912 7.81844,4.07869l19.28784,0.07793l0.166,6.65242l-19.04936,0.03277c-1.52849,1.64088 -4.26949,3.18618 -8.22293,4.48412c-3.70341,1.21586 -8.0679,2.08244 -12.71361,2.59967l0.35118,6.26044l-20.1751,0.02663l-0.36987,-6.17552c-5.04122,-0.49948 -9.79023,-1.40324 -13.77429,-2.71122c-3.71176,-1.21859 -6.35476,-2.65518 -7.92899,-4.1843l-18.89669,0.11974l-0.65241,-6.75399l19.35164,-0.12515c1.54603,-1.60296 4.25483,-3.11123 8.1264,-4.38234c3.72058,-1.22148 8.10839,-2.09042 12.77826,-2.60681z" fill="url(#g2)" /><path d="M228.56096,142.91033l20.12742,-0.22467l0.35081,6.41394c5.02515,0.50038 9.75851,1.40266 13.73117,2.70696c3.62621,1.1905 6.23234,2.58912 7.81844,4.07869l19.28784,0.07793l0.166,6.65242l-19.04936,0.03277c-1.52849,1.64088 -4.26949,3.18618 -8.22293,4.48412c-3.70341,1.21586 -8.0679,2.08244 -12.71361,2.59967l0.35118,6.26044l-20.1751,0.02663l-0.36987,-6.17552c-5.04122,-0.49948 -9.79023,-1.40324 -13.77429,-2.71122c-3.71176,-1.21859 -6.35476,-2.65518 -7.92899,-4.1843l-18.89669,0.11974l-0.65241,-6.75399l19.35164,-0.12515c1.54603,-1.60296 4.25483,-3.11123 8.1264,-4.38234c3.72058,-1.22148 8.10839,-2.09042 12.77826,-2.60681z" fill="url(#g3)" /></g>`};
 function line(b){const w=[];for(const p of['X','O'])for(const f of['','~'])for(const l of LN){const v=l.map(i=>b[i]);
   if(v.every(x=>x==='Q'||x===p+f)&&v.some(x=>x!=='Q')&&!w.includes(p))w.push(p)}return w}
-function init(){const u={b:Array(N+1).fill(null)};u.b[1]=E();S={unis:[u],turn:'X',log:[],over:null,last:[]};H=[];MODE='place';PEND=null;FULL=false;CPU_BUSY=false;msg('');render()}
-function play(st,u,t,c,who,o={}){
+function init(){const u={b:Array(N+1).fill(null)};u.b[1]=E();S={unis:[u],turn:'X',log:[],over:null,last:[]};H=[];MODE='place';PEND=null;TUNNEL=null;FULL=false;CPU_BUSY=false;msg('');render()}
+function placeOnBoard(st,u,t,c,pc,o={}){
   const U=st.unis[u];let base,top=N;while(top>1&&!U.b[top])top--;
   if(t===top)return{err:'That board is the present, and you can\u2019t move to it. Play into the future or travel to the past.'};
   if(U.b[t])base=U.b[t].slice();else{let s=t-1;while(s>=1&&!U.b[s])s--;base=s>=1?U.b[s].slice():E()}
   if(base[c])return{err:'That square is already taken on this board.'};
-  const pc=who+(o.f?'~':'');let clash=false;for(let k=t+1;k<=N;k++)if(U.b[k]&&U.b[k][c])clash=true;
+  let clash=false;for(let k=t+1;k<=N;k++)if(U.b[k]&&U.b[k][c])clash=true;
+  const qmerge=OPT.quantum&&o.q==='q',sp=OPT.soundproof;
   if(clash&&OPT.quantum&&!o.q)return{ask:true};
-  const n=cl(st),br=clash&&!(OPT.quantum&&o.q==='q');base[c]=pc;let ch=[[u,t]];
+  const n=cl(st),br=clash&&!qmerge&&!sp;base[c]=pc;let ch=[[u,t]];
   if(br){
     if(n.unis.length>=N)return{err:'That move needs a new universe, but all 12 already exist.'};
     const V={b:Array(N+1).fill(null)};V.b[t]=base;n.unis.push(V);u=n.unis.length-1;ch=[[u,t]];
   }else{
     const NU=n.unis[u];NU.b[t]=base;
-    for(let k=t+1;k<=N;k++)if(NU.b[k]){const x=NU.b[k][c];NU.b[k][c]=!x?pc:(x===pc?x:'Q');ch.push([u,k])}
+    if(!sp||qmerge)for(let k=t+1;k<=N;k++)if(NU.b[k]){const x=NU.b[k][c];NU.b[k][c]=!x?pc:(x===pc?x:'Q');ch.push([u,k])}
   }
   return{st:n,u,ch,branch:br};
+}
+function play(st,u,t,c,who,o={}){return placeOnBoard(st,u,t,c,who+(o.f?'~':''),o)}
+function tunnel(st,su,s0,sc,du,dt,dc){
+  if(dc!==sc)return{err:'A wormhole preserves position: destination must be the same square.'};
+  if(du===su&&dt===s0)return{err:'Choose a different universe or time for the wormhole.'};
+  const pc=st.unis[su].b[s0]?st.unis[su].b[s0][sc]:'';
+  if(!pc)return{err:'Pick a piece to tunnel.'};
+  if(pc==='Q')return{err:"Quantum pieces can't be tunneled."};
+  const w=cl(st);w.unis[su].b[s0][sc]='';
+  const r=placeOnBoard(w,du,dt,dc,pc,{q:OPT.quantum?'q':''});
+  if(r.err)return r;
+  r.ch=[[su,s0],...r.ch];return r;
 }
 function flipAt(st,u,t,cells){const n=cl(st),U=n.unis[u],ch=[];
   for(let k=t;k<=N;k++)if(U.b[k]){let a=false;for(const c of cells){const v=U.b[k][c];if(v&&v!=='Q'){U.b[k][c]=v.endsWith('~')?v[0]:v+'~';a=true}}if(a)ch.push([u,k])}
@@ -159,6 +172,18 @@ function cpuMoves(st,who){
       if(U.b.slice(t+1).some(Boolean)){
         const r=flipAt(st,u,t,[0,1,2,3,4,5,6,7,8]);
         out.push({...r,kind:'flipBoard',c:-1,u0:u,t0:t});
+      }
+    }
+  }
+  if(OPT.tunneller){
+    let mt=1;for(const U of st.unis){for(let k=N;k>=1;k--)if(U.b[k]){if(k>mt)mt=k;break}}
+    for(let su=0;su<st.unis.length;su++)for(let s0=1;s0<=N;s0++){const B=st.unis[su].b[s0];if(!B)continue;
+      for(let sc=0;sc<9;sc++){const pc=B[sc];if(!pc||pc=='Q')continue;
+        for(let du=0;du<st.unis.length;du++)for(let dt=1;dt<=Math.min(N,mt+1);dt++){
+          if(du===su&&dt===s0)continue;
+          const r=tunnel(st,su,s0,sc,du,dt,sc);
+          if(!r.err)out.push({...r,kind:'tunnel',c:sc,u0:su,t0:s0,dt});
+        }
       }
     }
   }
@@ -251,6 +276,7 @@ function cpuChoose(st){
 function cpuLabel(r){
   if(r.kind==='flipPiece')return 'F'+co(r.c)+'-'+LET[r.u0]+r.t0;
   if(r.kind==='flipBoard')return 'F'+LET[r.u0]+r.t0;
+  if(r.kind==='tunnel')return 'W'+co(r.c)+'-'+LET[r.u0]+r.t0+'>'+LET[r.u]+r.dt;
   return co(r.c)+'-'+LET[r.u]+r.t;
 }
 
@@ -285,6 +311,19 @@ function act(u,t,c,q){
     if(!U.b[t]){msg('That board is frozen; there is nothing to flip.');render();return}
     if(!U.b.slice(t+1).some(Boolean)){msg('Only past boards can be flipped: another board must sit above it.');render();return}
     const r=flipAt(S,u,t,[0,1,2,3,4,5,6,7,8]);return commit(r.st,who,r.ch,'F'+LET[u]+t)}
+  if(MODE==='tunnel'){
+    if(!TUNNEL){
+      if(!v||v==='Q'){msg('Pick a piece to tunnel (quantum pieces can\u2019t be tunneled).');render();return}
+      TUNNEL=[u,t,c];msg('Wormhole opened at '+co(c)+' on '+LET[u]+t+'. Pick the same square on a different board.');render();return}
+    const[su,s0,sc]=TUNNEL;
+    if(u===su&&t===s0&&c===sc){TUNNEL=null;msg('Wormhole cancelled.');render();return}
+    if(c!==sc){msg('Wormhole preserves position: pick square '+co(sc)+' on a different board.');render();return}
+    const r=tunnel(S,su,s0,sc,u,t,c);
+    if(r.err){msg(r.err);render();return}
+    const lab='W'+co(c)+'-'+LET[su]+s0+'>'+LET[r.u]+t;TUNNEL=null;
+    if(r.branch)msg('Paradox: a new universe branched.');
+    return commit(r.st,who,r.ch,lab);
+  }
   const o={f:MODE==='placeF',q},r=play(S,u,t,c,who,o);
   if(r.err){msg(r.err);render();return}
   if(r.ask){PEND=[u,t,c];render();return}
@@ -299,18 +338,20 @@ function boardSVG(u,t,b){
   let h=`<svg class="bs" viewBox="26.91 85.41 426.17 189.18" role="group" aria-label="Universe ${LET[u]}, time ${t}${b?'':', frozen'}">`;
   h+=b?ART.board:`<g transform="translate(26.91366 85.41239) scale(1.0499)">${ART.frozen}</g>`;
   if(w||last)h+=`<polygon points="${RIM}" fill="none" stroke="${w?'#28be91':'#f07311'}" stroke-width="7"/>`;
-  if(b){const ps=[];for(let c=0;c<9;c++)if(b[c]){const v=b[c],[cx,cy]=cellPos(c),r=REF[v[0]];const key=u+':'+t+':'+c;PCN[key]=v;const nw=READY&&!RM&&PC[key]!==v;ps.push([cy,`<g transform="translate(${cx-r[0]} ${cy-r[1]})"><g${nw?' class="pop"':''}>${ART[v]}</g></g>`])}
+  if(b){const ps=[];for(let c=0;c<9;c++)if(b[c]){const v=b[c],[cx,cy]=cellPos(c),r=REF[v[0]];const key=u+':'+t+':'+c;PCN[key]=v;const nw=READY&&!RM&&PC[key]!==v;const fl=v[0]==='X'?THEME.xRot:v[0]==='O'?THEME.oRot:0;const fstyle=fl?` style="filter:hue-rotate(${fl}deg)"`:'';ps.push([cy,`<g transform="translate(${cx-r[0]} ${cy-r[1]})"><g${nw?' class="pop"':''}${fstyle}>${ART[v]}</g></g>`])}
     h+=ps.sort((p,q)=>p[0]-q[0]).map(p=>p[1]).join('')}
+  if(TUNNEL&&TUNNEL[0]===u&&TUNNEL[1]===t){const[hx,hy]=cellPos(TUNNEL[2]);h+=`<polygon points="${hx-68},${hy} ${hx},${hy-25.6} ${hx+68},${hy} ${hx},${hy+25.6}" fill="none" stroke="var(--hl)" stroke-width="5" pointer-events="none"/>`}
   for(let c=0;c<9;c++){const[cx,cy]=cellPos(c),p=b?b[c]:'';
-    h+=`<polygon class="hit" data-u="${u}" data-t="${t}" data-c="${c}" tabindex="0" role="button" aria-label="Universe ${LET[u]}, time ${t}, ${co(c)}${p?', '+p:''}" points="${cx-68},${cy} ${cx},${cy-25.6} ${cx+68},${cy} ${cx},${cy+25.6}"/>`}
+    h+=`<polygon class="hit" data-u="${u}" data-t="${t}" data-c="${c}" tabindex="0" role="button" aria-label="Universe ${LET[u]}, time ${t}, ${co(c)}${p?', '+p:''}" points="${cx-68},${cy} ${cx},${cy-25.6} ${cx+68},${cy} ${cx},${cy+25.6}"/>`;
+    if(TUNNEL&&c===TUNNEL[2]&&!(TUNNEL[0]===u&&TUNNEL[1]===t))h+=`<polygon points="${cx-68},${cy} ${cx},${cy-25.6} ${cx+68},${cy} ${cx},${cy+25.6}" fill="rgba(255,240,189,0.18)" stroke="var(--hl)" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>`}
   return h+'</svg>'}
 function render(){
   PCN={};
   const maxT=Math.max(...S.unis.map(U=>{for(let k=N;k>=1;k--)if(U.b[k])return k;return 1}));
-  const rows=FULL?N:Math.min(N,maxT+1),cols=S.unis.length,R=.444,SX=.5,SY=.188;
+  const rows=FULL?N:Math.min(N,maxT+1),cols=S.unis.length,R=.444,s=THEME.sp/100,SX=.5,SY=.188,P0=.86;
   const avW=Math.min(innerWidth,1100)-32-50,avH=Math.max(300,innerHeight-300);
-  const W=Math.max(140,Math.floor(Math.min(avW/((cols-1)*SX+1),avH/(R*((rows-1)*.86+1)+(cols-1)*SY),560)));
-  const H=W*R,P=H*.86,dx=W*SX,dy=W*SY;
+  const W=Math.max(140,Math.floor(Math.min(avW/((cols-1)*SX+1),avH/(R*((rows-1)*P0+1)+(cols-1)*SY),560)));
+  const H=W*R,gU=s*W*.8,gT=s*H*.6,P=H*P0+gT,dx=W*SX+gU,dy=W*SY*(P/(H*P0));
   let h=`<div class="stage" style="width:${30+(cols-1)*dx+W+10}px;height:${(rows-1)*P+H+(cols-1)*dy+34}px">`;
   for(let t=1;t<=rows;t++)h+=`<div class="tl" style="top:${(rows-t)*P+H/2-8}px">${t}</div>`;
   for(let t=rows;t>=1;t--)S.unis.forEach((U,u)=>{h+=`<div class="bw" data-k="${u}:${t}" style="left:${30+u*dx}px;top:${(rows-t)*P+u*dy}px;width:${W}px;z-index:${(N-t)*20+u}">${boardSVG(u,t,U.b[t])}</div>`});
@@ -324,16 +365,37 @@ function render(){
   $('meta').textContent=`universes ${S.unis.length}/${N}`;
   $('log').innerHTML=S.log.length?S.log.map(s=>`<span>${s}</span>`).join(''):'<span style="color:var(--mute)">No moves yet</span>';
   $('undo').disabled=!H.length;$('full').textContent=FULL?'Fit to played times':'Expand to full size';
-  const M=$('modes');M.style.display=OPT.flip?'flex':'none';
-  M.innerHTML=[['place','Place'],['placeF','Place flipped'],['flipP','Flip piece'],['flipB','Flip board']].map(([k,l])=>`<button class="b${MODE===k?' on':''}" data-m="${k}">${l}</button>`).join('');
-  M.querySelectorAll('button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;msg('');render()});
+  const M=$('modes');M.style.display=(OPT.flip||OPT.tunneller)?'flex':'none';
+  const ml=[['place','Place']];if(OPT.flip)ml.push(['placeF','Place flipped'],['flipP','Flip piece'],['flipB','Flip board']);if(OPT.tunneller)ml.push(['tunnel','Wormhole']);
+  M.innerHTML=ml.map(([k,l])=>`<button class="b${MODE===k?' on':''}" data-m="${k}">${l}</button>`).join('');
+  M.querySelectorAll('button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;TUNNEL=null;msg('');render()});
   $('ask').style.display=PEND?'flex':'none';
+  $('aB').style.display=OPT.soundproof?'none':'';
+  $('askTxt').textContent=OPT.soundproof?'That square is taken in a later board. Merge into a quantum piece?':'That square clashes with a later board.';
 }
-$('undo').onclick=()=>{if(H.length){S=H.pop();PEND=null;msg('');render()}};
+$('undo').onclick=()=>{if(H.length){S=H.pop();PEND=null;TUNNEL=null;msg('');render()}};
 $('new').onclick=init;$('full').onclick=()=>{FULL=!FULL;render()};
-$('oF').onchange=e=>{OPT.flip=e.target.checked;init()};$('oQ').onchange=e=>{OPT.quantum=e.target.checked;init()};$('oCPU').onchange=e=>{OPT.cpu=e.target.checked;init()};
+$('oF').onchange=e=>{OPT.flip=e.target.checked;init()};$('oQ').onchange=e=>{OPT.quantum=e.target.checked;init()};$('oSP').onchange=e=>{OPT.soundproof=e.target.checked;init()};$('oT').onchange=e=>{OPT.tunneller=e.target.checked;init()};$('oCPU').onchange=e=>{OPT.cpu=e.target.checked;init()};
 $('aB').onclick=()=>PEND&&act(...PEND,'b');$('aQ').onclick=()=>PEND&&act(...PEND,'q');$('aC').onclick=()=>{PEND=null;render()};
 const hit=e=>{const p=e.target.closest&&e.target.closest('.hit');if(p)act(+p.dataset.u,+p.dataset.t,+p.dataset.c)};
 $('field').addEventListener('click',hit);$('field').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();hit(e)}});
+/* Theme */
+const THEME={pri:'#1c8565',sec:'#e8650a',mode:'auto',xRot:0,oRot:0,sp:0};
+try{const s=JSON.parse(localStorage.getItem('threefold_theme')||'{}');if(s.pri)THEME.pri=s.pri;if(s.sec)THEME.sec=s.sec;if(s.mode)THEME.mode=s.mode;if(typeof s.sp==='number')THEME.sp=s.sp}catch(e){}
+function hexHue(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const r=parseInt(h.slice(0,2),16)/255,g=parseInt(h.slice(2,4),16)/255,b=parseInt(h.slice(4,6),16)/255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;let H=0;if(d){if(mx===r)H=60*((g-b)/d%6);else if(mx===g)H=60*((b-r)/d+2);else H=60*((r-g)/d+4)}if(H<0)H+=360;return H}
+function mix(h,amt){h=h.replace('#','');const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);const m=(v)=>Math.round(v+(amt>0?(255-v)*amt:v*amt));return'#'+[m(r),m(g),m(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function applyTheme(){
+  const R=document.documentElement.style;
+  const def=THEME.pri==='#1c8565'&&THEME.sec==='#e8650a';
+  if(def){['--green','--green2','--x','--or','--o'].forEach(v=>R.removeProperty(v))}
+  else{R.setProperty('--green',THEME.pri);R.setProperty('--green2',mix(THEME.pri,0.25));R.setProperty('--x',THEME.pri);R.setProperty('--or',THEME.sec);R.setProperty('--o',mix(THEME.sec,-0.15))}
+  THEME.xRot=def?0:Math.round(hexHue(THEME.pri)-hexHue('#1c8565'));
+  THEME.oRot=def?0:Math.round(hexHue(THEME.sec)-hexHue('#e8650a'));
+  if(THEME.mode==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',THEME.mode);
+  try{localStorage.setItem('threefold_theme',JSON.stringify({pri:THEME.pri,sec:THEME.sec,mode:THEME.mode,sp:THEME.sp}))}catch(e){}
+  if(typeof S!=='undefined')render();
+}
+addEventListener('message',e=>{if(e.data&&e.data.type==='threefold-theme'){const d=e.data;if(d.pri)THEME.pri=d.pri;if(d.sec)THEME.sec=d.sec;if(typeof d.sp==='number')THEME.sp=d.sp;if(d.mode)THEME.mode=d.mode;applyTheme()}});
+applyTheme();
 addEventListener('resize',render);init();
 </script></body></html>
