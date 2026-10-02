@@ -124,11 +124,17 @@ function syncHyper(){if(HC){HC.games[HC.active]=S;HC.histories[HC.active]=H}}
 function nextHyperGame(){if(!HC||HC.seriesOver)return;const next=HC.active+1;if(next>=HC.n){HC.seriesOver=true;showEnd();return}HC.active=next;S=HC.games[next];H=HC.histories[next];VIEWST=null;MODE='place';PEND=null;TUNNEL=null;FULL=false;CPU_BUSY=false;CAM.user=false;SNAP=true;msg('');render();if(OPT.cpu&&S.turn===CPU)cpuAct()}
 function init(){const make=()=>{const u={b:Array(N+1).fill(null)};u.b[1]=E();return{unis:[u],turn:'X',log:[],over:null,last:[],wb:[]}};S=make();H=[];VIEWST=null;MODE='place';PEND=null;TUNNEL=null;FULL=false;CPU_BUSY=false;msg('');$('end').classList.add('hidden');CAM.user=false;SNAP=true;if(OPT.hypercube){HC={n:OPT.hyperN,games:Array.from({length:OPT.hyperN},()=>make()),histories:Array.from({length:OPT.hyperN},()=>[]),results:Array(OPT.hyperN).fill(null),active:0,seriesOver:false};S=HC.games[0];H=HC.histories[0]}else HC=null;render();if(OPT.cpu&&S.turn===CPU)cpuAct()}
 function placeOnBoard(st,u,t,c,pc,o={}){
-  const U=st.unis[u];if(!U)return{err:'That universe does not exist.'};let base,top=N;while(top>1&&!U.b[top])top--;
+  let U=st.unis[u];
+  if(!U){
+    if(!(OPT.portal&&o.portalCreate&&u===st.unis.length&&u<N))return{err:'That universe does not exist.'};
+    U={b:Array(N+1).fill(null)};
+  }
+  let base,top=N;while(top>1&&!U.b[top])top--;
   if(t===top)return{err:'That board is the present, and you can\u2019t move to it. Play into the future or travel to the past.'};
   if(OPT.brokenClock&&t<top)return{err:'Broken Clock: past travel is only available through a wormhole.'};
   if(U.b[t])base=U.b[t].slice();else{let s=t-1;while(s>=1&&!U.b[s])s--;base=s>=1?U.b[s].slice():E()}
   if(base[c])return{err:'That square is already taken on this board.'};
+  if(!st.unis[u])st.unis.push(U);
   let clash=false;for(let k=t+1;k<=N;k++)if(U.b[k]&&U.b[k][c])clash=true;
   const qm=OPT.quantum&&o.q==='q',sp=OPT.soundproof;
   if(clash&&OPT.quantum&&!o.q)return{ask:true};
@@ -146,18 +152,13 @@ const play=(st,u,t,c,who,o={})=>placeOnBoard(st,u,t,c,who+(o.f?'~':''),o);
 function tunnel(st,su,s0,sc,du,dt,dc){
   if(dc!==sc)return{err:'A wormhole preserves position: destination must be the same square.'};
   if(du===su&&dt===s0)return{err:'Choose a different universe or time for the wormhole.'};
-  const pc=st.unis[su]&&st.unis[su].b[s0]?st.unis[su].b[s0][sc]:'';
-  if(du!==su&&!OPT.portal){
-    const U=st.unis[du], DB=U&&U.b[dt];
-    let top=N; while(U&&top>1&&!U.b[top])top--;
-    let clash=false;
-    if(U&&dt<top&&!DB?.[sc]) for(let k=dt+1;k<=N;k++) if(U.b[k]&&U.b[k][sc]){clash=true;break}
-    if(!clash)return{err:'Portal is required for wormholes between universes unless the wormhole creates a paradox.'};
-  }
+  const src=st.unis[su],pc=src&&src.b[s0]?src.b[s0][sc]:'';
   if(!pc)return{err:'Pick a piece to tunnel.'};
   if(pc==='Q')return{err:"Quantum pieces can't be tunneled."};
+  const creating=!st.unis[du]&&OPT.portal&&du===st.unis.length&&du<N;
+  if(!st.unis[du]&&!creating)return{err:'Portal can only create the next universe.'};
   const w=fc(st),sb=w.unis[su].b[s0].slice();sb[sc]='';w.unis[su].b[s0]=sb;
-  const r=placeOnBoard(w,du,dt,dc,pc,{q:OPT.quantum?'q':''});
+  const r=placeOnBoard(w,du,dt,dc,pc,{q:OPT.quantum?'q':'',portalCreate:creating});
   if(r.err)return r;
   r.ch=[[su,s0],...r.ch];return r;
 }
@@ -188,7 +189,8 @@ function cpuMoves(st,who){const out=[];let mt=1;for(const U of st.unis)for(let k
     if(U.b.slice(t+1).some(Boolean))out.push({...flipAt(st,u,t,ALLC),kind:'flipBoard',c:-1,u0:u,t0:t})}
   if(OPT.tunneller)for(let su=0;su<st.unis.length;su++)for(let s0=1;s0<=N;s0++){const B=st.unis[su].b[s0];if(!B)continue;
     for(let sc=0;sc<NC;sc++){const pc=B[sc];if(!pc||pc==='Q')continue;
-      for(let du=0;du<st.unis.length;du++)for(let dt=1;dt<=tm;dt++){if(du===su&&dt===s0)continue;const r=tunnel(st,su,s0,sc,du,dt,sc);if(!r.err)out.push({...r,kind:'tunnel',c:sc,u0:su,t0:s0,dt})}}}
+      const dus=Array.from({length:st.unis.length+(OPT.portal&&st.unis.length<N?1:0)},(_,i)=>i);
+      for(const du of dus)for(let dt=1;dt<=tm;dt++){if(du===su&&dt===s0)continue;const r=tunnel(st,su,s0,sc,du,dt,sc);if(!r.err)out.push({...r,kind:'tunnel',c:sc,u0:su,t0:s0,dt})}}}
   return out}
 const cpuWinningMoves=(st,who)=>cpuMoves(st,who).filter(r=>cpuWinFor(r.st,who,r.ch)===who);
 function cpuChoose(st){const T0=performance.now(),all=cpuMoves(st,CPU);if(!all.length)return null;
@@ -212,7 +214,7 @@ function commit(n,who,ch,lab){
   n.log=S.log.concat(pre+who+lab);H.push(S);S=n;syncHyper();PEND=null;render();
   if(S.over){if(OPT.hypercube&&HC){HC.results[HC.active]=win||'T';const series=hyperSeries();if(series){HC.seriesOver=true;showEnd()}else{msg(`${win||'Tie'} takes Game ${HC.active+1}. Next game…`);setTimeout(nextHyperGame,850)}}else showEnd()}else if(OPT.cpu&&S.turn===CPU)cpuAct()}
 function act(u,t,c,q){
-  if(S.over||CPU_BUSY||(OPT.cpu&&S.turn===CPU))return;const who=S.turn,U=S.unis[u],v=U.b[t]?U.b[t][c]:'';msg('');PEND=null;
+  if(S.over||CPU_BUSY||(OPT.cpu&&S.turn===CPU))return;const who=S.turn,U=S.unis[u],v=U&&U.b[t]?U.b[t][c]:'';msg('');PEND=null;
   if(MODE==='flipP'){if(!v||v==='Q'){msg('Pick a piece to flip (quantum pieces can\u2019t be flipped).');render();return}
     const r=flipAt(S,u,t,[c]);return commit(r.st,who,r.ch,'F'+co(c)+'-'+LET[u]+t)}
   if(MODE==='flipB'){if(!U.b[t]){msg('That board is frozen; there is nothing to flip.');render();return}
@@ -262,7 +264,7 @@ function render(){
     for(let gi=0;gi<games.length;gi++){
       const D=gi===active?(VIEWST||games[gi]):games[gi];
       const maxT=Math.max(...D.unis.map(U=>{for(let k=N;k>=1;k--)if(U.b[k])return k;return 1}));
-      const rows=FULL?N:Math.min(N,maxT+1),cols=(FULL&&OPT.portal)?N:D.unis.length,R=g.vb[3]/g.vb[2],ss=THEME.sp/100,W=g.W,H=W*R;
+      const rows=FULL?N:Math.min(N,maxT+1),cols=(OPT.portal&&(FULL||(MODE==='tunnel'&&gi===active)))?N:D.unis.length,R=g.vb[3]/g.vb[2],ss=THEME.sp/100,W=g.W,H=W*R;
       const gU=ss*W*.8,gT=ss*H*.6,P=flat?H*1.1+gT:H*.86+gT,dx=flat?W*1.1+gU:W*.5+gU,dy=flat?0:W*.188*(P/(H*.86));
       const w=30+(cols-1)*dx+W+10,h=(rows-1)*P+H+(cols-1)*dy+34;local.push({D,rows,cols,W,H,P,dx,dy,w,h});maxW=Math.max(maxW,w);maxH=Math.max(maxH,h)
     }
@@ -306,7 +308,7 @@ function render(){
     ST={w:maxW*1.25,h:maxH*1.1};
   }else{
     const D=VIEWST||S;const maxT=Math.max(...D.unis.map(U=>{for(let k=N;k>=1;k--)if(U.b[k])return k;return 1}));
-    const rows=FULL?N:Math.min(N,maxT+1),cols=(FULL&&OPT.portal)?N:D.unis.length,R=g.vb[3]/g.vb[2],ss=THEME.sp/100,W=g.W,H=W*R;
+    const rows=FULL?N:Math.min(N,maxT+1),cols=(OPT.portal&&(FULL||MODE==='tunnel'))?N:D.unis.length,R=g.vb[3]/g.vb[2],ss=THEME.sp/100,W=g.W,H=W*R;
     const gU=ss*W*.8,gT=ss*H*.6,P=flat?H*1.1+gT:H*.86+gT,dx=flat?W*1.1+gU:W*.5+gU,dy=flat?0:W*.188*(P/(H*.86));
     ST={w:30+(cols-1)*dx+W+10,h:(rows-1)*P+H+(cols-1)*dy+34};let h=`<div class="stage" style="width:${ST.w}px;height:${ST.h}px">`;for(let t=1;t<=rows;t++)h+=`<div class="tl" style="top:${(rows-t)*P+H/2-8}px">${t}</div>`;for(let t=rows;t>=1;t--)for(let u=0;u<cols;u++){const U=D.unis[u];h+=`<div class="bw" data-k="${u}:${t}" style="left:${30+u*dx}px;top:${(rows-t)*P+u*dy}px;width:${W}px;z-index:${(N-t)*20+u}">${boardSVG(u,t,U&&U.b[t])}</div>`}for(let u=0;u<cols;u++)h+=`<div class="ul" style="left:${30+u*dx+W/2-6}px;top:${(rows-1)*P+H+u*dy+2}px">${LET[u]}</div>`;$('world').innerHTML=h+'</div>';$('view').classList.toggle('over',!!S.over);$('view').classList.toggle('viewonly',!!VIEWST);
   }
